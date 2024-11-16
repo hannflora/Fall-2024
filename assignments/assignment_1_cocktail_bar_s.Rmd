@@ -32,7 +32,7 @@ Note: There are several different ways to solve these tasks, feel free to come u
 Read the cocktail dataset from: <https://github.com/nthun/cocktail-balance> You can also find the codebook there.
 
 ```{r}
-
+cocktail_data <- read_tsv("https://raw.githubusercontent.com/nthun/cocktail-balance/refs/heads/master/cocktail_data.tsv")
 ```
 
 ## 2. Transform the data table and clean the ingredient variable!
@@ -40,15 +40,46 @@ Read the cocktail dataset from: <https://github.com/nthun/cocktail-balance> You 
 The ingredients are currently in a single cell for each cocktail. It would be better to put them in separate rows. Also, the variable should be cleaned of all quantities (e.g. 1/2 oz, 2 dashes, etc.), and the indicator of alcohol content (e.g. 47.3% abv). You will need to use this cleaned table in later tasks.
 
 ```{r}
+cocktail_data_clean <- cocktail_data %>% 
+  # splitting ingredients into separate rows
+  separate_rows(ingredients, sep = "<br/>") %>%
+  separate_rows(ingredients, sep = "<br>") %>% # because of a typo
+  separate_rows(ingredients, sep = "<b4/>") %>% # another typo
+  mutate(
+      ingredients = ingredients %>%
+        str_remove_all("\\b\\d+(?:\\.\\d+)?\\s?(oz | dash | dashes | drop | drops | bsp)\\b") %>% # quantities
+        str_remove_all("\\b\\d+/\\d+\\s?(oz | dash | dashes | drop | drops | bsp)\\b") %>% # fractions
+        str_remove_all("\\b\\d+%\\s?(abv)\\b") %>% # alcohol content
+        str_remove_all("\\([^)]*\\)") %>% # parentheses
+        str_remove_all("(?<!\\d)\\b\\d+\\b(?!\\s*-proof)") %>% # standalone numbers but not "-proof"
+        str_remove_all("/") %>% # stray slashes
+        str_trim() # whitespace
+  )
 
+# correcting typos
+cocktail_data_clean_corr <- cocktail_data_clean %>% 
+  mutate(
+    ingredients = case_when(
+      str_detect(ingredients, "cacao") ~ "white creme de cacao", # replacing special character "è"
+      str_detect(ingredients, "^simple$") ~ "simple syrup", # adding missing "syrup"
+      str_detect(ingredients, "Marschino") ~ "Luxardo Maraschino", # correcting typo
+      TRUE ~ ingredients
+    )
+  ) %>% 
+  distinct()
 ```
 
 ## 3. All ingredients in alphabetical order
 
-Before opening the bar, you need to find a reliable supplier that has all the ingredients. You need to send a list of all possible ingredients you will need. They don't need the quantities (i.e. how many of these are needed), just the names of the ingredients.
+Before opening the bar, you need to find a reliable supplier that has all the ingredients. You need to send a list of all possible ingredients you will need. They don't need the quantities (i.e. how many of these are needed), just the names of the ingredients. I need this in a table.
 
 ```{r}
+ingredients_list <- cocktail_data_clean_corr %>% 
+  select(ingredients) %>% 
+  distinct() %>% 
+  arrange(tolower(ingredients))
 
+print(ingredients_list, n = "all")
 ```
 
 ## 4. Number of unique ingredients
@@ -56,7 +87,9 @@ Before opening the bar, you need to find a reliable supplier that has all the in
 How many different ingredients you will need?
 
 ```{r}
+nrow(ingredients_list)
 
+# 60 different ingredients
 ```
 
 ## 5. What are the top 10 ingredients?
@@ -64,7 +97,23 @@ How many different ingredients you will need?
 What are the 10 most frequently used ingredients? If there are ties, you can list more than 10.
 
 ```{r}
+ingredient_counts <- cocktail_data_clean_corr %>%
+  count(ingredients) %>%  # counting occurrences of each ingredient
+  arrange(desc(n)) # arranging by frequency
 
+# identifying the 10th highest frequency
+tenth_frequency <- ingredient_counts %>%
+  select(n) %>% 
+  distinct() %>% 
+  slice(10) %>%
+  pull(n)
+
+# listing ingredients equal or above the 10th highest frequency
+top_10_ingredients <- ingredient_counts %>%
+  filter(n >= tenth_frequency)
+
+# printing ingredients
+print(top_10_ingredients, n = "all")
 ```
 
 ## 6. Which cocktail(s) has/have the most ingredients?
@@ -72,25 +121,55 @@ What are the 10 most frequently used ingredients? If there are ties, you can lis
 Count the number of ingredients and filter all the cocktails that has that many.
 
 ```{r}
+# counting number of ingredients per cocktail
+cocktail_ingredient_count <- cocktail_data_clean_corr %>%
+  group_by(name) %>%
+  summarise(ingredient_count = n()) %>%
+  ungroup()
 
+# identifying highest ingredient count
+max_ingredients <- max(cocktail_ingredient_count$ingredient_count)
+
+# listing cocktails with the highest ingredient count
+top_ingredient_cocktails <- cocktail_ingredient_count %>%
+  filter(ingredient_count == max_ingredients)
+
+top_ingredient_cocktails
 ```
 
 ## 7. How many ingredients appear in only one cocktail (rare ingredient)?
 
 ```{r}
+# filtering ingredients that appear in only one cocktail
+ingredients_in_one_cocktail <- ingredient_counts %>%
+  filter(n == 1)
 
+# counting rare ingredients
+nrow(ingredients_in_one_cocktail)
+
+# 26 rare ingredients
 ```
 
 ## 8. Which cocktail has an ingredient that is only used in one cocktail?
 
 ```{r}
+rare_ingredient_cocktails <- ingredients_in_one_cocktail %>% 
+  inner_join(cocktail_data_clean_corr, by = "ingredients") %>% 
+  select(name) %>% 
+  distinct()
 
+print(rare_ingredient_cocktails, n = "all")
 ```
 
 ## 9. What are the cocktails without rare ingredients?
 
 ```{r}
-  
+no_rare_ing_cocktails <- cocktail_data_clean_corr %>% 
+  anti_join(rare_ingredient_cocktails, by = "name") %>% 
+  select(name) %>% 
+  distinct()
+
+print(no_rare_ing_cocktails, n = "all")
 ```
 
 ## 10. Create a cheat sheet for the bartender!
@@ -98,9 +177,20 @@ Count the number of ingredients and filter all the cocktails that has that many.
 Create a matrix that shows all cocktail names as rows and all ingredients as columns. When a cocktail requires an ingredient, there should be an "X" in the cell, otherwise, the cell should remain empty. Example:
 
 ```{r}
+cheat_sheet <- cocktail_data_clean_corr %>%
+  arrange(tolower(ingredients)) %>%
+  pivot_wider(names_from = ingredients, 
+              values_from = ingredients, 
+              values_fn = length,
+              values_fill = list(ingredients = NA)) %>%
+  janitor::clean_names() %>%
+  mutate(across(absinthe:yellow_chartreuse, ~ ifelse(is.na(.), "", "X"))) %>% 
+  select(name, absinthe:yellow_chartreuse) %>% 
+  arrange(tolower(name))
 
+# View the matrix
+view(cheat_sheet)
 ```
-
 
 Congrats, the bar is now officially open!
 
