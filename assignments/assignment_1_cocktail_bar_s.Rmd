@@ -3,7 +3,7 @@ title: "Assignment 1: The cocktail bar (data transformation and manipulation)"
 author: "Tamas Nagy"
 output: html_document
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
 # Skills needed to solve this assignment
@@ -188,8 +188,14 @@ cheat_sheet <- cocktail_data_clean_corr %>%
   select(name, absinthe:yellow_chartreuse) %>% 
   arrange(tolower(name))
 
-# View the matrix
+# viewing the entire sheet
 view(cheat_sheet)
+
+# printing example
+example_cheat_sheet <- cheat_sheet[36:53, ] %>% 
+  select(name, angostura_bitters:campari)
+  
+knitr::kable(example_cheat_sheet)
 ```
 
 Congrats, the bar is now officially open!
