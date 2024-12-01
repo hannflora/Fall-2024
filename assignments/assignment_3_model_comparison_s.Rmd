@@ -3,7 +3,7 @@ title: "Assignment 3: Model comparison"
 author: "Marton Kovacs"
 output: html_document
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
 In this lab assignment you are going to work with (simulated) data related to perioperative pain and its psychological and hormonal predictors. In the assignment you will assess the added benefit of including some psychological and hormonal predictors to the already established demographic predictors of pain.
@@ -324,6 +324,7 @@ tab_model(
   show.aic = T,
   show.ci = 0.95
   )
+# age significantly negatively predicts pain in the simple model, while sex does not
 ```
 
 Create the more complex model based on the results of the model diagnostics. Also, get the results that need to be reported based on the What to report section.
@@ -343,6 +344,7 @@ tab_model(
   show.aic = T,
   show.ci = 0.95
   )
+# age (negatively), catastrophizing (positively), and serum cortisol (positively) significantly predict pain, while sex [male] (positively) predicts pain at trend level; trait anxiety and mindfulness do not significantly predict pain
 
 # equation:
   # pain = 2.06 - 0.05 * age + 0.32 * sex [male] + 0.02 * trait anxiety + 0.07 * catastrophizing -0.15 * mindfulness + 0.48 * serum cortsol
